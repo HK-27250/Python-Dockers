@@ -277,3 +277,47 @@ def view_students():
     ]
     
     return render_template('index.html', show_students=True, students=student_list)
+
+@app.route('/delete_student/<string:roll_no>')
+def delete_student(roll_no):
+    """Delete a student and their attendance records"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get student ID
+        cursor.execute("SELECT id FROM students WHERE roll_no = %s", (roll_no,))
+        student = cursor.fetchone()
+        
+        if not student:
+            conn.close()
+            flash(f"Student with roll number {roll_no} not found", "danger")
+            return redirect(url_for('view_students'))
+            
+        student_id = student[0]
+        
+        # First delete attendance records (due to foreign key constraint)
+        cursor.execute("DELETE FROM attendance WHERE student_id = %s", (student_id,))
+        
+        # Then delete the student
+        cursor.execute("DELETE FROM students WHERE id = %s", (student_id,))
+        
+        # Also delete face data if exists
+        face_image_path = f"face_images/{roll_no}.jpg"
+        face_encoding_path = f"face_encodings/{roll_no}.txt"
+        
+        if os.path.exists(face_image_path):
+            os.remove(face_image_path)
+            
+        if os.path.exists(face_encoding_path):
+            os.remove(face_encoding_path)
+        
+        conn.commit()
+        conn.close()
+        
+        flash(f"Student with roll number {roll_no} has been deleted", "success")
+    except Exception as e:
+        flash(f"Error deleting student: {str(e)}", "danger")
+        logging.error(f"Error deleting student: {str(e)}")
+        
+    return redirect(url_for('view_students'))
