@@ -1,0 +1,317 @@
+{% extends 'layout.html' %}
+
+{% block head %}
+<style>
+    #video-container {
+        position: relative;
+        max-width: 640px;
+        margin: 0 auto;
+    }
+    #video {
+        width: 100%;
+        border: 3px solid #343a40;
+        border-radius: 8px;
+    }
+    #overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(0, 0, 0, 0.5);
+        color: white;
+        font-size: 1.5rem;
+        border-radius: 8px;
+    }
+    #attendance-list {
+        height: 300px;
+        overflow-y: auto;
+    }
+    .status-icon {
+        font-size: 1.2rem;
+        margin-right: 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-12">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h1 class="h3 mb-0">Take Attendance</h1>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-7">
+                        <h2 class="h4 mb-3">Face Recognition</h2>
+                        <div class="alert alert-info">
+                            <p><i class="fas fa-info-circle me-2"></i> Instructions:</p>
+                            <ul>
+                                <li>Position each student's face in the camera</li>
+                                <li>The system will automatically recognize registered faces</li>
+                                <li>Recognized students will be marked present</li>
+                            </ul>
+                        </div>
+                        
+                        <div id="video-container" class="mb-3">
+                            <video id="video" autoplay playsinline></video>
+                            <div id="overlay" style="display: none;">Processing...</div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-center mb-3">
+                            <button id="start-btn" class="btn btn-primary">
+                                <i class="fas fa-play me-1"></i> Start Camera
+                            </button>
+                            <button id="pause-btn" class="btn btn-warning" disabled>
+                                <i class="fas fa-pause me-1"></i> Pause
+                            </button>
+                            <button id="stop-btn" class="btn btn-danger" disabled>
+                                <i class="fas fa-stop me-1"></i> Stop
+                            </button>
+                        </div>
+                        
+                        <div id="status-message"></div>
+                    </div>
+                    
+                    <div class="col-md-5">
+                        <h2 class="h4 mb-3">Attendance Log</h2>
+                        <div id="today-info" class="alert alert-light">
+                            <i class="far fa-calendar-alt me-2"></i>
+                            <span id="today-date">Loading...</span>
+                        </div>
+                        
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span>Recent Records</span>
+                                    <a href="{{ url_for('reports') }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-file-alt me-1"></i> Full Report
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="list-group list-group-flush" id="attendance-list">
+                                <div class="list-group-item text-center text-muted">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Attendance records will appear here
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const video = document.getElementById('video');
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('start-btn');
+        const pauseBtn = document.getElementById('pause-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const statusMessage = document.getElementById('status-message');
+        const attendanceList = document.getElementById('attendance-list');
+        const todayDate = document.getElementById('today-date');
+        
+        // Display today's date
+        const today = new Date();
+        todayDate.textContent = today.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+        });
+        
+        let stream = null;
+        let isRunning = false;
+        let captureInterval = null;
+        let recognizedStudents = new Set();
+        
+        // Start button event
+        startBtn.addEventListener('click', async function() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: "user" 
+                    }
+                });
+                video.srcObject = stream;
+                
+                startBtn.disabled = true;
+                pauseBtn.disabled = false;
+                stopBtn.disabled = false;
+                isRunning = true;
+                
+                statusMessage.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-video me-2"></i>
+                        Camera started. Recognition running...
+                    </div>
+                `;
+                
+                // Start periodic face recognition (every 2 seconds)
+                captureInterval = setInterval(captureAndRecognize, 2000);
+                
+            } catch (err) {
+                statusMessage.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Error accessing camera: ${err.message}
+                    </div>
+                `;
+            }
+        });
+        
+        // Pause button event
+        pauseBtn.addEventListener('click', function() {
+            if (isRunning) {
+                clearInterval(captureInterval);
+                isRunning = false;
+                pauseBtn.innerHTML = '<i class="fas fa-play me-1"></i> Resume';
+                statusMessage.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-pause-circle me-2"></i>
+                        Recognition paused
+                    </div>
+                `;
+            } else {
+                captureInterval = setInterval(captureAndRecognize, 2000);
+                isRunning = true;
+                pauseBtn.innerHTML = '<i class="fas fa-pause me-1"></i> Pause';
+                statusMessage.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-video me-2"></i>
+                        Recognition resumed...
+                    </div>
+                `;
+            }
+        });
+        
+        // Stop button event
+        stopBtn.addEventListener('click', function() {
+            if (stream) {
+                clearInterval(captureInterval);
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                
+                startBtn.disabled = false;
+                pauseBtn.disabled = true;
+                stopBtn.disabled = true;
+                
+                statusMessage.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Camera stopped
+                    </div>
+                `;
+                
+                // Reset button text if needed
+                pauseBtn.innerHTML = '<i class="fas fa-pause me-1"></i> Pause';
+            }
+        });
+        
+        // Function to capture and recognize faces
+        async function captureAndRecognize() {
+            if (!video.srcObject) return;
+            
+            // Show processing overlay
+            overlay.style.display = 'flex';
+            
+            try {
+                // Create canvas and capture image
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+                
+                // Get image data
+                const imageData = canvas.toDataURL('image/jpeg');
+                
+                // Send to server for recognition
+                const formData = new FormData();
+                formData.append('image_data', imageData);
+                
+                const response = await fetch('/recognize', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Add to attendance list if it's a new recognition
+                    const now = new Date();
+                    const timeString = now.toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit' 
+                    });
+                    
+                    const listItem = document.createElement('div');
+                    listItem.className = 'list-group-item';
+                    
+                    if (data.duplicate) {
+                        // Already marked attendance
+                        listItem.innerHTML = `
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="status-icon text-warning">
+                                        <i class="fas fa-exclamation-circle"></i>
+                                    </span>
+                                    <strong>${data.name}</strong> (${data.roll_no})
+                                </div>
+                                <span class="badge bg-warning text-dark">${timeString}</span>
+                            </div>
+                            <small class="text-muted">Already marked present</small>
+                        `;
+                    } else {
+                        // New attendance marking
+                        listItem.innerHTML = `
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="status-icon text-success">
+                                        <i class="fas fa-check-circle"></i>
+                                    </span>
+                                    <strong>${data.name}</strong> (${data.roll_no})
+                                </div>
+                                <span class="badge bg-success">${timeString}</span>
+                            </div>
+                            <small class="text-muted">Marked present</small>
+                        `;
+                        
+                        // Add to recognized set
+                        recognizedStudents.add(data.roll_no);
+                    }
+                    
+                    // Add to top of the list
+                    if (attendanceList.firstChild) {
+                        attendanceList.insertBefore(listItem, attendanceList.firstChild);
+                    } else {
+                        attendanceList.appendChild(listItem);
+                    }
+                    
+                    // Remove placeholder if it exists
+                    const placeholder = document.querySelector('.list-group-item.text-center.text-muted');
+                    if (placeholder) {
+                        placeholder.remove();
+                    }
+                }
+            } catch (err) {
+                console.error('Recognition error:', err);
+            }
+            
+            // Hide processing overlay
+            overlay.style.display = 'none';
+        }
+    });
+</script>
+{% endblock %}
