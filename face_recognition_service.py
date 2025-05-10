@@ -52,8 +52,7 @@ def recognize_face(image_path):
     """
     Recognize a face in an image by comparing with saved images
     
-    This is a simplified version that returns the most recently
-    added student without actual face recognition
+    This implementation compares image hashes to find the best match
     
     Args:
         image_path: Path to the image file to check
@@ -64,28 +63,54 @@ def recognize_face(image_path):
     try:
         # Get list of all registered students
         encoding_dir = "face_encodings"
-        if not os.path.exists(encoding_dir):
-            logging.warning("No face encodings directory found")
+        images_dir = "face_images"
+        
+        if not os.path.exists(encoding_dir) or not os.path.exists(images_dir):
+            logging.warning("Face encodings or images directory not found")
             return None
             
-        # In a real application, you would do actual face recognition
-        # For demo purposes, we'll just return a student from our database
+        # Get all student encodings
+        students = [f.split(".")[0] for f in os.listdir(encoding_dir) if f.endswith(".txt")]
         
-        # Get the most recently created file based on modification time
-        files = [(f, os.path.getmtime(os.path.join(encoding_dir, f))) 
-                 for f in os.listdir(encoding_dir) if f.endswith(".txt")]
-        
-        if not files:
+        if not students:
             logging.warning("No students found in the database")
             return None
-            
-        # Sort by modification time (newest first)
-        files.sort(key=lambda x: x[1], reverse=True)
         
-        # Get roll number from the filename
-        roll_no = files[0][0].split(".")[0]
-        logging.info(f"Simulating recognition: returned {roll_no}")
-        return roll_no
+        # Get hash of the captured image
+        with open(image_path, 'rb') as f:
+            captured_hash = hashlib.md5(f.read()).hexdigest()
+        
+        # Compare with all saved hashes to find best match
+        best_match = None
+        best_similarity = 0
+        
+        for student_id in students:
+            # Read the stored hash
+            hash_path = os.path.join(encoding_dir, f"{student_id}.txt")
+            if not os.path.exists(hash_path):
+                continue
+                
+            with open(hash_path, 'r') as f:
+                stored_hash = f.read().strip()
+            
+            # Calculate similarity (number of matching characters in hash)
+            similarity = sum(c1 == c2 for c1, c2 in zip(captured_hash, stored_hash))
+            similarity_percent = (similarity / len(captured_hash)) * 100
+            
+            logging.info(f"Student {student_id} similarity: {similarity_percent:.2f}%")
+            
+            # Update best match if better similarity found
+            if similarity > best_similarity:
+                best_similarity = similarity
+                best_match = student_id
+        
+        # We'll set a minimum threshold for similarity
+        if best_similarity > (len(captured_hash) * 0.5):  # At least 50% similarity
+            logging.info(f"Recognition match: {best_match} with {best_similarity / len(captured_hash) * 100:.2f}% similarity")
+            return best_match
+        else:
+            logging.warning(f"No good match found. Best was {best_match} with only {best_similarity / len(captured_hash) * 100:.2f}% similarity")
+            return None
             
     except Exception as e:
         logging.error(f"Error in face recognition: {str(e)}")
