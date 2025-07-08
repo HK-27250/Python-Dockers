@@ -19,7 +19,8 @@ def get_db_connection():
             user=os.environ.get('PGUSER'),
             password=os.environ.get('PGPASSWORD'),
             host=os.environ.get('PGHOST'),
-            port=os.environ.get('PGPORT')
+            port=os.environ.get('PGPORT'),
+            sslmode='require'  # Required for Neon database
         )
         return conn
     except Exception as e:
