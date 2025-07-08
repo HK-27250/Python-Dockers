@@ -23,16 +23,9 @@ This is a Flask-based facial recognition attendance system that allows student r
 ## Key Components
 
 ### Application Files
-- `app.py`: Main application with database integration
-- `app_no_db.py`: Alternative version using in-memory storage
-- `working_main.py`: Simplified working version
+- `app.py`: Main application with Flask-SQLAlchemy integration and database models
 - `main.py`: Production entry point
-- `models.py`: Data model definitions (Student, Attendance)
-
-### Database Layer
-- `database.py`: Original PostgreSQL connection and setup
-- `new_database.py`: Updated database utilities
-- Database tables: `students` (id, name, roll_no, class) and `attendance` (id, student_id, date, status)
+- Database tables: `student` (id, name, roll_no, class) and `attendance` (id, student_id, date, status)
 
 ### Face Recognition
 - `face_recognition_service.py`: Simplified face processing service
