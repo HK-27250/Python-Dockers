@@ -1,0 +1,272 @@
+{% extends 'layout.html' %}
+
+{% block head %}
+<style>
+    #video-container {
+        position: relative;
+        max-width: 640px;
+        margin: 0 auto;
+    }
+    #video {
+        width: 100%;
+        border: 3px solid #343a40;
+        border-radius: 8px;
+    }
+    #overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: rgba(0, 0, 0, 0.5);
+        color: white;
+        font-size: 1.5rem;
+        border-radius: 8px;
+    }
+    .face-guide {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 200px;
+        height: 240px;
+        border: 3px solid #ffc107;
+        border-radius: 50%;
+        opacity: 0.7;
+        pointer-events: none;
+    }
+    .countdown {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h1 class="h3 mb-0">
+                    <i class="fas fa-camera me-2"></i>
+                    Capture Face for Student: {{ roll_no }}
+                </h1>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info mb-4">
+                    <h4><i class="fas fa-info-circle me-2"></i>Instructions:</h4>
+                    <ul class="mb-0">
+                        <li>Position your face within the oval guide</li>
+                        <li>Look directly at the camera</li>
+                        <li>Keep your face well-lit and visible</li>
+                        <li>Click "Capture Face" when ready</li>
+                    </ul>
+                </div>
+                
+                <div id="video-container" class="mb-4">
+                    <video id="video" autoplay playsinline></video>
+                    <div class="face-guide"></div>
+                    <div id="overlay" style="display: none;">Processing...</div>
+                    <div id="countdown" class="countdown" style="display: none;">3</div>
+                </div>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-center mb-4">
+                    <button id="start-camera" class="btn btn-primary btn-lg">
+                        <i class="fas fa-camera me-2"></i>Start Camera
+                    </button>
+                    <button id="capture-face" class="btn btn-success btn-lg" disabled>
+                        <i class="fas fa-user-check me-2"></i>Capture Face
+                    </button>
+                    <button id="retake" class="btn btn-warning btn-lg" style="display: none;">
+                        <i class="fas fa-redo me-2"></i>Retake
+                    </button>
+                </div>
+                
+                <div id="status-message"></div>
+                
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{{ url_for('register') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Registration
+                    </a>
+                    <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-home me-2"></i>Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const startCameraBtn = document.getElementById('start-camera');
+    const captureFaceBtn = document.getElementById('capture-face');
+    const retakeBtn = document.getElementById('retake');
+    const statusMessage = document.getElementById('status-message');
+    const countdown = document.getElementById('countdown');
+    
+    let stream = null;
+    let countdownInterval = null;
+    
+    // Start camera
+    startCameraBtn.addEventListener('click', async function() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    facingMode: "user" 
+                }
+            });
+            video.srcObject = stream;
+            
+            startCameraBtn.disabled = true;
+            captureFaceBtn.disabled = false;
+            
+            statusMessage.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    Camera started! Position your face in the guide and click "Capture Face"
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error accessing camera:', error);
+            statusMessage.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error accessing camera: ${error.message}
+                </div>
+            `;
+        }
+    });
+    
+    // Capture face
+    captureFaceBtn.addEventListener('click', function() {
+        if (!stream) return;
+        
+        // Start countdown
+        let count = 3;
+        countdown.textContent = count;
+        countdown.style.display = 'block';
+        
+        countdownInterval = setInterval(() => {
+            count--;
+            if (count > 0) {
+                countdown.textContent = count;
+            } else {
+                clearInterval(countdownInterval);
+                countdown.style.display = 'none';
+                captureImage();
+            }
+        }, 1000);
+        
+        captureFaceBtn.disabled = true;
+    });
+    
+    // Retake function
+    retakeBtn.addEventListener('click', function() {
+        retakeBtn.style.display = 'none';
+        captureFaceBtn.disabled = false;
+        statusMessage.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Ready for another capture. Position your face and click "Capture Face"
+            </div>
+        `;
+    });
+    
+    // Capture image function
+    async function captureImage() {
+        try {
+            overlay.style.display = 'flex';
+            
+            // Create canvas and capture image
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0);
+            
+            // Get image data
+            const imageData = canvas.toDataURL('image/jpeg');
+            
+            // Send to server
+            const formData = new FormData();
+            formData.append('image_data', imageData);
+            formData.append('roll_no', '{{ roll_no }}');
+            
+            const response = await fetch('/save_face', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            overlay.style.display = 'none';
+            
+            if (data.success) {
+                statusMessage.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i>
+                        ${data.message}
+                    </div>
+                `;
+                
+                // Stop camera
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    video.srcObject = null;
+                }
+                
+                // Redirect to home after 2 seconds
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+                
+            } else {
+                statusMessage.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${data.message}
+                    </div>
+                `;
+                retakeBtn.style.display = 'inline-block';
+            }
+            
+        } catch (error) {
+            overlay.style.display = 'none';
+            console.error('Error capturing face:', error);
+            statusMessage.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Error capturing face: ${error.message}
+                </div>
+            `;
+            retakeBtn.style.display = 'inline-block';
+        }
+    }
+    
+    // Clean up when page unloads
+    window.addEventListener('beforeunload', function() {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+        if (countdownInterval) {
+            clearInterval(countdownInterval);
+        }
+    });
+});
+</script>
+{% endblock %}
