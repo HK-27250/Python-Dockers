@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  facial-recognition-app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - SESSION_SECRET=${SESSION_SECRET:-your-secret-key-here}
+      - FLASK_ENV=production
+    volumes:
+      - ./face_images:/app/face_images
+      - ./face_encodings:/app/face_encodings
+      - ./attendance.db:/app/attendance.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

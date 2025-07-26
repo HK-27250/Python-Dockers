@@ -110,8 +110,32 @@ This is a Flask-based facial recognition attendance system that allows student r
 - File-based face encoding storage
 - Modular architecture for easy extension
 
+## Docker Support
+
+### Docker Files Created
+- `Dockerfile`: Multi-stage build optimized for production
+- `docker-compose.yml`: Complete container orchestration setup
+- `.dockerignore`: Optimized build context exclusions
+- `build-docker.sh`: Automated build script with instructions
+- `README-Docker.md`: Comprehensive deployment guide
+- `validate-docker-setup.sh`: Setup validation script
+
+### Docker Features
+- **Base Image**: python:3.11-slim for optimal size and security
+- **Health Checks**: Built-in application monitoring
+- **Volume Mounting**: Persistent data storage for face images, encodings, and database
+- **Environment Variables**: Configurable SESSION_SECRET and FLASK_ENV
+- **Production Ready**: Optimized for deployment with gunicorn
+
+### Deployment Options
+1. **Single Container**: `docker run` with volume mounts
+2. **Docker Compose**: `docker-compose up -d` for easy management
+3. **Build Script**: `./build-docker.sh` for automated building
+
 ## Changelog
-- July 08, 2025. Initial setup
+- July 26, 2025: Added complete Docker containerization support
+- July 15, 2025: Fixed database connection issues, switched to SQLite for reliability
+- July 08, 2025: Initial setup
 
 ## User Preferences
 
