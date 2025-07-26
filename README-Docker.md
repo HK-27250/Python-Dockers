@@ -21,16 +21,30 @@ chmod +x build-docker.sh
 
 ### Option 2: Manual Docker Build
 
+**Linux/Mac:**
 ```bash
 # Build the Docker image
-docker build -t facial-recognition-attendance:latest .
+docker build -t attendance-app .
 
 # Run the container
 docker run -p 5000:5000 \
   -v $(pwd)/face_images:/app/face_images \
   -v $(pwd)/face_encodings:/app/face_encodings \
   -v $(pwd)/attendance.db:/app/attendance.db \
-  facial-recognition-attendance:latest
+  attendance-app
+```
+
+**Windows PowerShell:**
+```powershell
+# Build the Docker image
+docker build -t attendance-app .
+
+# Run the container
+docker run -p 5000:5000 \
+  -v ${PWD}/face_images:/app/face_images \
+  -v ${PWD}/face_encodings:/app/face_encodings \
+  -v ${PWD}/attendance.db:/app/attendance.db \
+  attendance-app
 ```
 
 ### Option 3: Using Docker Compose
